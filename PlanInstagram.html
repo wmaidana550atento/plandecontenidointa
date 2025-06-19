@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plano de Conteúdo Interativo - WMDigital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Neutrals with a Teal Accent -->
+    <!-- Application Structure Plan: The application is structured as an interactive dashboard. The core is a grid of 30 cards, representing each day of the plan. This visual calendar format provides a quick overview. Key interactions include: 1) Clicking a card to open a modal with detailed information for that day, including the pre-designed image. This keeps the main interface clean. 2) Filtering controls at the top to dynamically display content by week or format (Reel, Carrusel, etc.), transforming the static plan into an analytical tool. 3) A summary chart visualizes the distribution of content formats. This structure was chosen because it enhances usability, allowing the user to explore, filter, and analyze the content strategy in ways a static table cannot. -->
+    <!-- Visualization & Content Choices: The main data (daily content plan) is presented as interactive cards (HTML/CSS), which is more engaging than a table. For summarization (Goal: Inform/Compare), a Donut Chart (Chart.js/Canvas) is used to show the distribution of content formats, providing a quick, high-level insight into the content strategy balance. The choice of a donut chart is effective for showing part-to-whole relationships. Daily details, including the specific image for the day, are shown in a modal (JS interaction) to avoid information overload and provide full context in one place. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            margin: auto;
+        }
+        .modal {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
+        .card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .filter-btn.active {
+            background-color: #0d9488; /* teal-600 */
+            color: white;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div id="app" class="container mx-auto p-4 sm:p-6 lg:p-8">
+        
+        <header class="text-center mb-10">
+            <h1 class="text-3xl sm:text-4xl font-bold text-slate-900">Plano de Conteúdo Interativo</h1>
+            <p class="mt-2 text-lg text-slate-600">A sua estratégia de 30 dias para a WMDigital.pt</p>
+        </header>
+
+        <section id="analytics" class="mb-12 p-6 bg-white rounded-xl shadow-md">
+            <h2 class="text-2xl font-bold text-center mb-4 text-slate-800">Resumo da Estratégia</h2>
+            <p class="text-center text-slate-600 mb-6 max-w-2xl mx-auto">
+                Este gráfico mostra a distribuição dos formatos de conteúdo planeados para os próximos 30 dias. Permite-lhe visualizar rapidamente o equilíbrio da sua estratégia, por exemplo, quantos Reels estão programados em comparação com os Carrosséis ou as Histórias. Utilize esta vista para assegurar uma mistura de conteúdo variada e atrativa.
+            </p>
+            <div class="chart-container">
+                <canvas id="formatChart"></canvas>
+            </div>
+        </section>
+
+        <section id="plan">
+            <h2 class="text-2xl font-bold text-center mb-4 text-slate-800">Calendário de Conteúdo</h2>
+             <p class="text-center text-slate-600 mb-8 max-w-3xl mx-auto">
+                Aqui encontrará o plano de conteúdo completo. Clique em qualquer dia para ver os detalhes, incluindo a imagem da história, a ideia de conteúdo, a proposta de legenda e as hashtags. Use os filtros abaixo para explorar o plano por semana ou por formato de publicação.
+            </p>
+
+            <div id="filters" class="flex flex-col sm:flex-row justify-center items-center gap-4 mb-8">
+                <div id="week-filters" class="flex flex-wrap justify-center gap-2"></div>
+                <div id="format-filters" class="flex flex-wrap justify-center gap-2"></div>
+            </div>
+            
+            <div id="content-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            </div>
+        </section>
+
+    </div>
+
+    <div id="modal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 opacity-0 pointer-events-none">
+        <div id="modal-content" class="modal-content bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden transform scale-95 grid grid-cols-1 md:grid-cols-3">
+            <!-- Image Column -->
+            <div class="md:col-span-1 bg-slate-100">
+                 <img id="modal-image" src="" alt="Imagem representativa do conteúdo do dia" class="object-cover w-full h-full">
+            </div>
+            <!-- Content Column -->
+            <div class="md:col-span-2 p-6 sm:p-8 overflow-y-auto">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 id="modal-title" class="text-2xl font-bold text-slate-900"></h3>
+                        <span id="modal-format" class="text-sm font-semibold text-white px-3 py-1 rounded-full"></span>
+                    </div>
+                    <button id="modal-close" class="text-slate-500 hover:text-slate-800 transition-colors">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+                <div class="space-y-6 text-slate-700">
+                    <div>
+                        <h4 class="font-semibold text-lg text-slate-800 border-b-2 border-teal-200 pb-2 mb-2">💡 Ideia de Conteúdo</h4>
+                        <p id="modal-idea"></p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-lg text-slate-800 border-b-2 border-teal-200 pb-2 mb-2">✍️ Legenda Proposta</h4>
+                        <p id="modal-caption" class="whitespace-pre-wrap"></p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-lg text-slate-800 border-b-2 border-teal-200 pb-2 mb-2">#️ Hashtags</h4>
+                        <p id="modal-hashtags" class="text-teal-700 font-medium"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const contentData = [
+            { dia: 1, semana: 1, tema: 'O que é o Marketing Digital?', formato: 'Carrossel', idea: '"Deslize para descobrir o Marketing Digital". 1. Título. 2. Definição simples. 3. Áreas-chave (SEO, Redes Sociais, Email). 4. Porque é crucial para o seu negócio? 5. Contacte-nos para começar! (CTA)', caption: '🤔 Sabe realmente o que é o Marketing Digital e como pode transformar o seu negócio? Contamos-lhe tudo neste post! É o motor que impulsiona as marcas no mundo online. Está pronto para arrancar o seu? 🚀', hashtags: '#MarketingDigital #WMDigital #EstrategiaDigital #MarketingPortugal #NegociosOnline', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513498846380032.jpeg' },
+            { dia: 2, semana: 1, tema: 'Importância de uma Estratégia', formato: 'História', idea: 'Pergunta: "O seu negócio já tem uma estratégia de marketing digital definida para 2024?" Opções: "Sim, a todo o gás! 👍" / "Não, preciso de ajuda 🤔". Fundo com o logótipo da empresa.', caption: '-', hashtags: '#Inquerito #EstrategiaDigital #DicasMarketing', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513500247293952.jpeg' },
+            { dia: 3, semana: 1, tema: 'Erros Comuns', formato: 'Reel', idea: '"3 Erros de Marketing que está a cometer (e como resolvê-los)". Vídeo rápido a mostrar textos: 1. Não conhecer o seu público. 2. Ignorar o SEO. 3. Não analisar resultados. Finaliza com uma solução visual.', caption: 'Evite estes erros e veja o seu negócio a descolar! 📈 O marketing digital tem os seus truques, e nós contamos-lhos. Comete algum destes? Deixe-nos um comentário! 👇', hashtags: '#ErrosMarketing #DicasMarketingDigital #SEO #Empreendedorismo #WMDigital', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513501383794688.jpeg' },
+            { dia: 4, semana: 1, tema: 'Apresentação da Equipa', formato: 'Carrossel', idea: '"Conheça a equipa da WMDigital". Fotos profissionais e divertidas da equipa. Cada slide apresenta um membro com o seu papel e uma frase que o defina.', caption: 'Eles são os cérebros por detrás da magia! 🧠✨ Na WMDigital, somos uma equipa de apaixonados por marketing com um só objetivo: fazer a sua marca crescer. Conheça-nos!', hashtags: '#EquipaWMD #MarketingExperts #AgenciaDeMarketing #QuemSomos #PortugalBusiness', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513502575247360.jpeg' },
+            { dia: 5, semana: 1, tema: 'Benefícios do Email Marketing', formato: 'História', idea: 'Sticker de perguntas: "Pergunte-nos o que quiser sobre Email Marketing 📧".', caption: '-', hashtags: '#EmailMarketing #PerguntasERespostas #MarketingDirecto', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513503837569024.jpeg' },
+            { dia: 6, semana: 1, tema: 'Caso de Sucesso (Cliente 1)', formato: 'Carrossel', idea: '"Antes e Depois: [Nome do Cliente]". 1. O desafio. 2. A nossa estratégia. 3. Resultados (gráficos simples: +X% em vendas, +Y% em tráfego). 4. Testemunho do cliente.', caption: 'Os resultados falam por si! Veja como ajudámos a/o [Nome do Cliente] a atingir os seus objetivos. Um bom plano de marketing muda tudo. Quer ser o nosso próximo caso de sucesso?', hashtags: '#CasoDeSucesso #ResultadosReais #MarketingEficaz #ClientesFelizes #WMDigitalPT', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513504936394752.jpeg' },
+            { dia: 7, semana: 1, tema: 'Descanso / Inspiração', formato: 'História', idea: 'Uma foto inspiradora do escritório ou de uma paisagem portuguesa. Texto: "A recarregar energias para uma semana cheia de marketing. Bom fim de semana!"', caption: '-', hashtags: '#FimDeSemana #Inspiracao #Portugal #MarketingLife', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513506161164288.jpeg' },
+            { dia: 8, semana: 2, tema: 'O que é o SEO?', formato: 'Reel', idea: '"SEO explicado em 15 segundos". Vídeo dinâmico com ícones e texto: Palavra-chave -> Google -> Posição #1 -> Mais Clientes. Simples e visual.', caption: 'Quer que os seus clientes o encontrem no Google? Precisa de SEO! 🔍 É como colocar a sua loja na rua principal da internet. Aparece na primeira página?', hashtags: '#SEO #PosicionamentoWeb #MarketingDePesquisa #Google #DicasSEO', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513507297665024.jpeg' },
+            { dia: 9, semana: 2, tema: 'A importância do Branding', formato: 'Carrossel', idea: '"A sua Marca é mais do que um Logótipo". 1. Título. 2. O que é o branding? (Identidade, voz, valores). 3. Exemplos de bom branding (marcas conhecidas). 4. Como define a sua marca? 5. Ajudamo-lo a construí-la!', caption: 'Uma marca forte gera confiança e lealdade. Não se trata apenas de ter bom aspeto, trata-se de conectar. A sua marca conecta-se com o seu público? Fale connosco.', hashtags: '#Branding #IdentidadeDeMarca #DesignGrafico #EstrategiaDeMarca #WMDigital', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513508497276928.jpeg' },
+            { dia: 10, semana: 2, tema: 'Marketing de Conteúdos', formato: 'História', idea: 'Quiz rápido: "Que tipo de conteúdo prefere a sua audiência?". Opções: Blogs / Vídeos / Infográficos.', caption: '-', hashtags: '#MarketingDeConteudos #ContentMarketing #QuizInterativo', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513509612732416.jpeg' },
+            { dia: 11, semana: 2, tema: 'Publicidade em Redes Sociais', formato: 'Carrossel', idea: '"Guia Rápido: Anúncios no Instagram e Facebook". 1. Porque investir em Ads. 2. Tipos de anúncios (foto, vídeo, carrossel). 3. Chave: A segmentação. 4. Meça os seus resultados. 5. Pronto para lançar a sua campanha?', caption: 'Não espere que os clientes cheguem, vá atrás deles! A publicidade nas redes sociais permite-lhe chegar ao seu público ideal de forma direta. Precisa de ajuda para começar?', hashtags: '#SocialAds #FacebookAds #InstagramAds #PublicidadeDigital #MarketingOnline', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513510795051008.jpeg' },
+            { dia: 12, semana: 2, tema: 'Ferramentas Úteis', formato: 'Reel', idea: '"3 Ferramentas de Marketing GRÁTIS que adoramos". Captura de ecrã rápida de ferramentas como Canva, Google Analytics, Metricool.', caption: 'Otimize o seu marketing sem gastar um euro! Estas são algumas das nossas ferramentas gratuitas favoritas. Conhece alguma outra? Partilhe nos comentários!', hashtags: '#FerramentasMarketing #MarketingGratis #Canva #GoogleAnalytics #DicasMarketing', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513512002994176.jpeg' },
+            { dia: 13, semana: 2, tema: 'Nos Bastidores', formato: 'História', idea: 'Vídeo curto da equipa numa reunião de brainstorming, a tomar um café ou a trabalhar num projeto.', caption: 'Um pouco do nosso dia a dia na #WMDigital. A criar estratégias que funcionam! 💡', hashtags: '#NosBastidores #DiaNoEscritorio #VidaDeAgencia #EquipaMarketing', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513513181888512.jpeg' },
+            { dia: 14, semana: 2, tema: 'Frase Motivacional', formato: 'Imagem Fixa', idea: 'Design limpo com uma frase sobre marketing ou empreendedorismo. "O bom marketing faz a empresa parecer inteligente. O ótimo marketing faz o cliente sentir-se inteligente." - Joe Chernov', caption: 'Uma pequena dose de inspiração para terminar a semana. O foco deve estar sempre no cliente!', hashtags: '#FraseDoDia #InspiracaoMarketing #Motivacao #MarketingQuotes #Empreender', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513514415046656.jpeg' },
+            { dia: 15, semana: 3, tema: 'Como definir a sua Buyer Persona', formato: 'Carrossel', idea: '"Passo a passo: Crie a sua Buyer Persona". 1. O que é? 2. Dados demográficos. 3. Metas e desafios. 4. Onde procura informação. 5. Dê-lhe um nome e um rosto. (Usar um avatar de exemplo).', caption: 'Se fala para toda a gente, não fala para ninguém. Conhecer o seu cliente ideal é o primeiro passo para uma estratégia de sucesso. Já criou a sua Buyer Persona?', hashtags: '#BuyerPersona #ClienteIdeal #EstrategiaDeConteudo #DicasMarketing #ConhecaOSeuCliente', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513515597987840.jpeg' },
+            { dia: 16, semana: 3, tema: 'Mitos do Marketing Digital', formato: 'Reel', idea: '"Mitos do Marketing DESMENTIDOS!". Vídeo dinâmico. "Mito: \'O meu negócio não precisa de redes sociais\' -> REALIDADE: \'Todos os seus clientes estão nelas\'".', caption: 'Ainda acredita que o marketing digital é só para grandes empresas? Vamos quebrar alguns mitos! Deslize e surpreenda-se.', hashtags: '#MitosMarketing #MarketingReal #DigitalMarketingFacts #Empreendedores', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513516667502592.jpeg' },
+            { dia: 17, semana: 3, tema: 'Analytics: Que métricas importam?', formato: 'Carrossel', idea: '"Métricas que realmente importam". 1. Título. 2. Alcance e Impressões. 3. Taxa de Interação (Engagement). 4. CTR (Click-Through Rate). 5. Taxa de Conversão. Explicação simples de cada uma.', caption: 'Não se afogue em dados. Concentre-se nas métricas que realmente medem o sucesso da sua estrategia. Sabe interpretar os seus resultados? Nós ensinamo-lo!', hashtags: '#Analytics #Metricas #MarketingDeResultados #KPIs #GoogleAnalytics', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513517807894528.jpeg' },
+            { dia: 18, semana: 3, tema: 'Tutorial Rápido', formato: 'Reel', idea: '"Como criar uma história de Instagram atrativa em 1 minuto". Mostra-se o processo usando as ferramentas do Instagram (GIFs, inquéritos, música).', caption: 'Tire o máximo partido das suas histórias! Com estes truques simples, aumentará a interação dos seus seguidores. Experimente e diga-nos como correu!', hashtags: '#DicasInstagram #Tutorial #HistoriasInstagram #SocialMediaTips #DIYMarketing', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513519007506432.jpeg' },
+            { dia: 19, semana: 3, tema: 'Sessão de Q&A em Direto', formato: 'Live', idea: 'Anunciar um Direto para o final do dia com um sticker de "Avisa-me". O tema: "Pergunta a um especialista em Marketing Digital".', caption: 'Temos um encontro marcado! Esta tarde vamos resolver todas as suas dúvidas sobre marketing digital num direto. Prepare as suas perguntas e participe!', hashtags: '#Live #DiretoInstagram #AskMeAnything #MarketingExpert #WMDigital', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513520114630656.jpeg' },
+            { dia: 20, semana: 3, tema: 'Testemunho em Vídeo', formato: 'Reel', idea: 'Um cliente satisfeito grava um vídeo curto (selfie) a contar a sua experiência com a WMDigital.', caption: 'A opinião dos nossos clientes é o nosso melhor cartão de visita! Obrigado/a [Nome do Cliente] pela sua confiança. 🙌', hashtags: '#Testemunho #ClienteSatisfeito #ProvaSocial #Confianca #Resultados', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513521263722496.jpeg' },
+            { dia: 21, semana: 3, tema: 'Conteúdo gerado pelo utilizador', formato: 'História', idea: 'Partilhar uma publicação ou história onde um cliente tenha mencionado @wmdigital.pt, agradecendo-lhe.', caption: 'Adoramos ver como aplicam as nossas dicas! Obrigado por nos mencionarem. Juntos crescemos mais!', hashtags: '#UGC #Comunidade #Clientes #Obrigado #MarketingColaborativo', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513522366676992.jpeg' },
+            { dia: 22, semana: 4, tema: 'Como criar um Funil de Vendas?', formato: 'Carrossel', idea: '"De seguidor a cliente: O seu funil de vendas". 1. Título. 2. TOFU (Atração). 3. MOFU (Consideração). 4. BOFU (Conversão). 5. Fidelização. Gráficos simples.', caption: 'Converta os seus seguidores em clientes fiéis com um funil de vendas bem estruturado. Sabe em que fase se encontram os seus potenciais clientes?', hashtags: '#FunilDeVendas #Conversao #SalesFunnel #EstrategiaMarketing #VendasOnline', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513523524108288.jpeg' },
+            { dia: 23, semana: 4, tema: 'Tendências de Marketing', formato: 'Reel', idea: '"3 Tendências de Marketing que vão dominar 2024". Vídeo com texto: 1. IA em Marketing. 2. Vídeo Marketing Curto (Reels/TikTok). 3. Marketing de Autenticidade.', caption: 'Antecipe-se ao futuro! Estas são as tendências que vão marcar o mundo do marketing. A sua marca está preparada?', hashtags: '#TendenciasMarketing #Marketing2024 #FuturoDoMarketing #IA #VideoMarketing', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513524677115904.jpeg' },
+            { dia: 24, semana: 4, tema: 'Psicologia da Cor', formato: 'Carrossel', idea: '"Diz-me que cor usas e dir-te-ei o que transmites". Slides com cores (azul, vermelho, verde, etc.) и as emoções/valores que evocam no marketing.', caption: 'As cores comunicam. Sabia que a cor do seu logótipo ou dos seus anúncios pode influenciar a decisão de compra? Descubra o poder da psicologia da cor!', hashtags: '#PsicologiaDaCor #DicasBranding #DesignDeMarca #MarketingVisual #Cores', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513525859713024.jpeg' },
+            { dia: 25, semana: 4, tema: 'Promoção de um Serviço', formato: 'Imagem/Vídeo', idea: 'Gráfico ou vídeo curto a promover um serviço-chave (ex. "Gestão de Redes Sociais" ou "Consultoria SEO"). Incluir uma oferta especial: "Consulta gratuita este mês!".', caption: 'Precisa de ajuda com as suas redes sociais? Deixe connosco! Liberte o seu tempo e veja a sua comunidade a crescer. Envie-nos uma DM para uma consulta GRÁTIS.', hashtags: '#ServicosMarketing #GestaoRedesSociais #CommunityManager #EspecialistaSEO #OfertaEspecial', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513526958538752.jpeg' },
+            { dia: 26, semana: 4, tema: 'Artigo de Blog', formato: 'História', idea: 'Captura de ecrã do último artigo do blog com um link "Ver mais". Título apelativo como "Os 5 segredos do SEO local".', caption: 'Novo artigo no blog! Descubra como dominar o SEO local e atrair mais clientes da sua zona. Link na bio e nas histórias!', hashtags: '#NovoPost #BlogMarketing #SEOLocal #MarketingDeConteudos #AprendaConnosco', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513528137433088.jpeg' },
+            { dia: 27, semana: 4, tema: 'Facto Curioso de Marketing', formato: 'História', idea: '"Sabia que... 88% dos consumidores confia tanto nas avaliações online como nas recomendações pessoais".', caption: '-', hashtags: '#FactoCurioso #MarketingData #SabiaQue #Estatisticas', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513529244557312.jpeg' },
+            { dia: 28, semana: 4, tema: 'Chamada à Ação (CTA) Final', formato: 'Imagem Fixa', idea: 'Design atrativo com uma pergunta e um CTA claro: "Pronto para levar o seu marketing ao próximo nível? Fale connosco! Link na bio."', caption: 'Não deixe para amanhã o crescimento que pode começar hoje. Contacte-nos e descubra o que uma estratégia de marketing digital profissional pode fazer por si.', hashtags: '#ChamadaParaAcao #CTA #Contacto #MarketingDigitalPortugal #WMDigitalPT', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513530335019008.jpeg' },
+            { dia: 29, semana: 4, tema: 'Resumo da Semana', formato: 'Reel', idea: 'Uma montagem rápida com clips/imagens das melhores publicações da semana.', caption: 'Um pequeno resumo de tudo o que aprendemos juntos esta semana! Qual foi o seu post favorito?', hashtags: '#ResumoSemanal #RecapitularMarketing #ConteudoDeValor', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513531484110848.jpeg' },
+            { dia: 30, semana: 4, tema: 'Agradecimento', formato: 'História', idea: 'Uma imagem de agradecimento à comunidade. "Obrigado por nos acompanhar este mês! Continuamos aqui para o ajudar a crescer."', caption: 'Já somos mais de [Número de seguidores]! Obrigado por fazer parte da comunidade da WMDigital. Isto é só o começo. 💪', hashtags: '#Comunidade #Obrigado #Seguidores #MarketingComProposito', imageUrl: 'https://storage.googleapis.com/gemini-prod-us-west1-4335-tools-gallery/1722513532658880512.jpeg' },
+        ];
+
+        const formatColors = {
+            'Carrossel': 'bg-sky-500',
+            'Reel': 'bg-purple-500',
+            'História': 'bg-pink-500',
+            'Live': 'bg-red-500',
+            'Imagem Fixa': 'bg-orange-500',
+            'Imagem/Vídeo': 'bg-amber-500',
+        };
+        
+        let activeFilters = { week: 'all', format: 'all' };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupFilters();
+            renderGrid();
+            renderChart();
+            setupModal();
+        });
+
+        function setupFilters() {
+            const weekFiltersContainer = document.getElementById('week-filters');
+            const formatFiltersContainer = document.getElementById('format-filters');
+
+            const weeks = ['Todos', 'Semana 1', 'Semana 2', 'Semana 3', 'Semana 4'];
+            weeks.forEach((week, index) => {
+                const btn = document.createElement('button');
+                btn.textContent = week;
+                btn.dataset.filterType = 'week';
+                btn.dataset.filterValue = index === 0 ? 'all' : index;
+                btn.className = 'filter-btn px-4 py-2 text-sm font-medium text-slate-700 bg-white rounded-full shadow-sm hover:bg-slate-100 transition-colors';
+                if (index === 0) btn.classList.add('active');
+                weekFiltersContainer.appendChild(btn);
+            });
+            
+            const formats = ['Todos', ...Object.keys(formatColors)];
+            formats.forEach(format => {
+                const btn = document.createElement('button');
+                btn.textContent = format;
+                btn.dataset.filterType = 'format';
+                btn.dataset.filterValue = format === 'Todos' ? 'all' : format;
+                btn.className = 'filter-btn px-4 py-2 text-sm font-medium text-slate-700 bg-white rounded-full shadow-sm hover:bg-slate-100 transition-colors';
+                if (format === 'Todos') btn.classList.add('active');
+                formatFiltersContainer.appendChild(btn);
+            });
+
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const { filterType, filterValue } = btn.dataset;
+                    activeFilters[filterType] = filterValue;
+                    
+                    document.querySelectorAll(`[data-filter-type="${filterType}"]`).forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    renderGrid();
+                });
+            });
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('content-grid');
+            grid.innerHTML = '';
+
+            const filteredData = contentData.filter(item => {
+                const weekMatch = activeFilters.week === 'all' || item.semana == activeFilters.week;
+                const formatMatch = activeFilters.format === 'all' || item.formato == activeFilters.format;
+                return weekMatch && formatMatch;
+            });
+            
+            filteredData.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card bg-white p-4 rounded-lg shadow-md flex flex-col justify-between cursor-pointer';
+                card.dataset.day = item.dia;
+
+                const formatColor = formatColors[item.formato] || 'bg-slate-400';
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <p class="text-xl font-bold text-slate-500">Dia ${item.dia}</p>
+                            <span class="text-xs font-semibold text-white px-2 py-1 ${formatColor} rounded-full">${item.formato}</span>
+                        </div>
+                        <h4 class="font-bold text-slate-800 h-12">${item.tema}</h4>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-4">Semana ${item.semana}</p>
+                `;
+                card.addEventListener('click', () => showModal(item.dia));
+                grid.appendChild(card);
+            });
+        }
+
+        function renderChart() {
+            const formatCounts = contentData.reduce((acc, item) => {
+                acc[item.formato] = (acc[item.formato] || 0) + 1;
+                return acc;
+            }, {});
+
+            const ctx = document.getElementById('formatChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(formatCounts),
+                    datasets: [{
+                        label: 'Distribuição de Formatos',
+                        data: Object.values(formatCounts),
+                        backgroundColor: Object.keys(formatCounts).map(format => {
+                           const colorClass = formatColors[format] || 'bg-slate-400';
+                           const colorCode = getComputedStyle(document.body).getPropertyValue('--' + colorClass.replace('bg-','').replace('-500', '')) || '#cbd5e1';
+                           return colorCode;
+                        }),
+                        borderColor: '#f8fafc',
+                        borderWidth: 4,
+                        hoverOffset: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    family: 'Inter'
+                                },
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            bodyFont: {
+                                family: 'Inter'
+                            },
+                            titleFont: {
+                                family: 'Inter'
+                            }
+                        }
+                    },
+                    cutout: '60%'
+                },
+                plugins: [{
+                    id: 'tailwindColors',
+                    beforeDraw: (chart) => {
+                        const tailwindColors = {
+                            'sky-500': '#0ea5e9',
+                            'purple-500': '#a855f7',
+                            'pink-500': '#ec4899',
+                            'red-500': '#ef4444',
+                            'orange-500': '#f97316',
+                            'amber-500': '#f59e0b',
+                            'slate-400': '#94a3b8'
+                        };
+                         chart.data.datasets[0].backgroundColor = chart.data.labels.map(label => {
+                            const colorKey = Object.keys(formatColors).find(key => key === label);
+                            const colorClass = formatColors[colorKey] || 'bg-slate-400';
+                            return tailwindColors[colorClass.replace('bg-','')];
+                        });
+                    }
+                }]
+            });
+        }
+        
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modal-content');
+        const modalClose = document.getElementById('modal-close');
+
+        function showModal(day) {
+            const item = contentData.find(d => d.dia === day);
+            if (!item) return;
+
+            document.getElementById('modal-image').src = item.imageUrl;
+            document.getElementById('modal-image').alt = item.tema;
+            document.getElementById('modal-title').textContent = `Dia ${item.dia}: ${item.tema}`;
+            const formatSpan = document.getElementById('modal-format');
+            formatSpan.textContent = item.formato;
+            formatSpan.className = `text-sm font-semibold text-white px-3 py-1 rounded-full ${formatColors[item.formato] || 'bg-slate-400'}`;
+            document.getElementById('modal-idea').textContent = item.idea;
+            document.getElementById('modal-caption').textContent = item.caption;
+            document.getElementById('modal-hashtags').textContent = item.hashtags;
+            
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modalContent.classList.remove('scale-95');
+        }
+
+        function setupModal() {
+            modalClose.addEventListener('click', hideModal);
+            modal.addEventListener('click', (e) => {
+                if (!modalContent.contains(e.target)) {
+                    hideModal();
+                }
+            });
+        }
+
+        function hideModal() {
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('pointer-events-none');
+            }, 300);
+        }
+
+    </script>
+</body>
+</html>
